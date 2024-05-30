@@ -41,7 +41,7 @@ ___
     - Search on different search engines (Google, Bing, Yandex)
     - Google Dorks (acquired by company, company. All Rights Reserved., © 2021 company. All Rights Reserved., company. All Rights Reserved." -inurl:company, acquired by target. target subsidiaries)
     - Search SSL on Shodan, FOFA and Censys.
-    - Find same DMARC Information [DMARC Live)(https://dmarc.live/info/yahoo.com)
+    - Find same DMARC Information [DMARC Live](https://dmarc.live/info/yahoo.com)
 ___
 
 ### Content-Discovery
