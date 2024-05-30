@@ -24,7 +24,7 @@ ___
         - Scan ports 80, 443, and 8080 on the target IP address to discover new URLs.
         - Reverse DNS lookup
         - [Adtracker](https://github.com/dhn/udon) -- Use Udon, [BuiltWith](https://builtwith.com/) to use same Ad ID to search for similar domains/subdomains.
-      - {DNS BureForce](#DnsBF)
+      - [DNS BureForce](#DnsBF)
           - [PureDNS](https://github.com/d3mondev/puredns) --> Do a static DNS bruteforce with multiple worldlist. Assetnote, all.txt by JHaddix and SecLists are good options.
           - [Gotator](https://github.com/Josue87/gotator) and [DNSGen](https://github.com/AlephNullSK/dnsgen) --> This gonna be a second-time/dynamic DNS bruteforce using permutation. *DO NOT SKIP THIS PART*
 ___
@@ -41,7 +41,7 @@ ___
     - Search on different search engines (Google, Bing, Yandex)
     - Google Dorks (acquired by company, company. All Rights Reserved., © 2021 company. All Rights Reserved., company. All Rights Reserved." -inurl:company, acquired by target. target subsidiaries)
     - Search SSL on Shodan, FOFA and Censys.
-    - Find same DMARC Information [DMARC Live)[https://dmarc.live/info/yahoo.com]
+    - Find same DMARC Information [DMARC Live)(https://dmarc.live/info/yahoo.com)
 ___
 
 ### Content-Discovery
