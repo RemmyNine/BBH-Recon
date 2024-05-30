@@ -32,16 +32,16 @@ ___
 ### Asset-Discovery
 
 - [Asset Discovery](#AssetDiscovery)
-         - Find ASNs + CIDRs + IP, NameServers --> PortScan + Reverse DNS Lookup
-         - Unqiue Strings, Copyrights.
-         - Find new assets on news, Stock market, Partners, about us.
-         - Find new assets on crunchbase and similar websites.
-         - Emails --> Reverse email lookup
-         - MailServers + Certificate --> Reverse MX + SSL Search (For SSL use crtsh)
-         - Search on different search engines (Google, Bing, Yandex)
-         - Google Dorks (acquired by company, company. All Rights Reserved., © 2021 company. All Rights Reserved., company. All Rights Reserved." -inurl:company, acquired by target. target subsidiaries)
-         - Search SSL on Shodan, FOFA and Censys.
-         - Find same DMARC Information [DMARC Live)[https://dmarc.live/info/yahoo.com]
+    - Find ASNs + CIDRs + IP, NameServers --> PortScan + Reverse DNS Lookup
+    - Unqiue Strings, Copyrights.
+    - Find new assets on news, Stock market, Partners, about us.
+    - Find new assets on crunchbase and similar websites.
+    - Emails --> Reverse email lookup
+    - MailServers + Certificate --> Reverse MX + SSL Search (For SSL use crtsh)
+    - Search on different search engines (Google, Bing, Yandex)
+    - Google Dorks (acquired by company, company. All Rights Reserved., © 2021 company. All Rights Reserved., company. All Rights Reserved." -inurl:company, acquired by target. target subsidiaries)
+    - Search SSL on Shodan, FOFA and Censys.
+    - Find same DMARC Information [DMARC Live)[https://dmarc.live/info/yahoo.com]
 ___
 
 ### Content-Discovery
