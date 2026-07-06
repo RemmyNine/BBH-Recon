@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Magnus — Offensive Security Bug Bounty & Recon Automation Script
+    Magnus - Offensive Security Bug Bounty & Recon Automation Script
 .DESCRIPTION
     A modular PowerShell recon automation framework covering subdomain enumeration,
     live HTTP discovery, port scanning, endpoint collection, content discovery,
@@ -92,7 +92,10 @@ param(
     [ValidateRange(5, 100)]
     [int]$Concurrency = 25,
 
-    [string]$OutputDir
+    [string]$OutputDir,
+
+    [Alias('h')]
+    [switch]$Help
 )
 
 # ----------------------------------------------------------------------------
@@ -105,7 +108,7 @@ $Banner = @"
  | |\/| | / _` || ' \ / _` || || |(_-<
  |_|  |_| \__, ||_||_|\__, | \_,_|/__/
            |___/       |___/           
-       Offensive Security • BBH + Red Team
+       Offensive Security * BBH + Red Team
 "@
 
 Write-Host $Banner -ForegroundColor Cyan
@@ -137,9 +140,9 @@ foreach ($Dir in $AllDirs) {
 
 # -- Resolver & Wordlist paths (set these to your local paths) --
 $ResolversFile  = Join-Path $ScriptRoot "resolvers.txt"
-$SubsWordlist   = Join-Path $ScriptRoot "wordlists" "subdomains-top1m.txt"
-$ContentWordlist = Join-Path $ScriptRoot "wordlists" "raft-medium-directories.txt"
-$Permutations   = Join-Path $ScriptRoot "wordlists" "permutations.txt"
+$SubsWordlist   = Join-Path (Join-Path $ScriptRoot "wordlists") "subdomains-top1m.txt"
+$ContentWordlist = Join-Path (Join-Path $ScriptRoot "wordlists") "raft-medium-directories.txt"
+$Permutations   = Join-Path (Join-Path $ScriptRoot "wordlists") "permutations.txt"
 
 # Download default resolvers if missing
 if (-not (Test-Path $ResolversFile)) {
@@ -221,7 +224,7 @@ function Invoke-RateLimited {
 # ----------------------------------------------------------------------------
 function Invoke-PassiveRecon {
     param([string]$TargetDomain, [string]$OutFile)
-    Write-Step "PASSIVE SUBDOMAIN ENUMERATION — $TargetDomain"
+    Write-Step "PASSIVE SUBDOMAIN ENUMERATION - $TargetDomain"
 
     $tmpSubfinder = "$env:TEMP\subfinder_$Timestamp.txt"
     $tmpAssetfinder = "$env:TEMP\assetfinder_$Timestamp.txt"
@@ -235,7 +238,7 @@ function Invoke-PassiveRecon {
 
     Write-Host "[+] crt.sh" -ForegroundColor Gray
     try {
-        $CrtshUri = "https://crt.sh/?q=%25.$TargetDomain" + "&output=json"
+        $CrtshUri = "https://crt.sh/?q=%25.$TargetDomain" + '&output=json'
         $CrtshResp = Invoke-RestMethod -Uri $CrtshUri -TimeoutSec 30
         $CrtshResp | ForEach-Object { $_.name_value } | ForEach-Object { $_ -split '\n' } |
             Where-Object { $_ -like "*.$TargetDomain" -or $_ -eq $TargetDomain } | Sort-Object -Unique |
@@ -259,7 +262,7 @@ function Invoke-DNSResolve {
     Write-Step "DNS RESOLUTION"
 
     if (-not (Get-Command puredns -ErrorAction SilentlyContinue)) {
-        Write-Host "[!] puredns not found — falling back to dnsx" -ForegroundColor Red
+        Write-Host "[!] puredns not found - falling back to dnsx" -ForegroundColor Red
         if (Get-Command dnsx -ErrorAction SilentlyContinue) {
             dnsx -l $SubsIn -r $ResolversFile -silent -o $ResolvedOut
         } else {
@@ -761,7 +764,7 @@ function Invoke-ComprehensivePortScan {
 # ----------------------------------------------------------------------------
 function Invoke-FullRecon {
     param([string]$TargetDomain)
-    Write-Step "FULL RECON WORKFLOW — $TargetDomain"
+    Write-Step "FULL RECON WORKFLOW - $TargetDomain"
     Write-Host "  Output Directory: $OutputDir" -ForegroundColor DarkGray
 
     # 1. Passive Subdomain Enumeration
@@ -814,11 +817,102 @@ function Invoke-FullRecon {
 }
 
 # ----------------------------------------------------------------------------
+# HELP DISPLAY
+# ----------------------------------------------------------------------------
+function Show-Help {
+    Write-Host ""
+    Write-Host "DESCRIPTION:" -ForegroundColor Cyan
+    Write-Host "  Magnus is a modular offensive security recon automation framework."
+    Write-Host "  It covers subdomain enumeration, live HTTP discovery, port scanning,"
+    Write-Host "  endpoint collection, content discovery, technology fingerprinting,"
+    Write-Host "  subdomain takeover checks, vulnerability scanning, and web crawling."
+    Write-Host ""
+    Write-Host "USAGE:" -ForegroundColor Cyan
+    Write-Host "  .\magnus.ps1 [MODE] <target> [OPTIONS]" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Target can be a domain (example.com) or a file containing targets."
+    Write-Host ""
+    Write-Host "MODES:" -ForegroundColor Cyan
+    Write-Host "  --recon, -Recon          " -ForegroundColor Yellow -NoNewline
+    Write-Host "Full recon workflow (passive subs -> DNS resolve -> HTTP probe -> port scan)"
+    Write-Host "  --passive, -Passive      " -ForegroundColor Yellow -NoNewline
+    Write-Host "Passive-only recon (Subfinder + crt.sh + Assetfinder, no active probing)"
+    Write-Host "  -gp, --endpoints         " -ForegroundColor Yellow -NoNewline
+    Write-Host "Wayback Machine + GAU endpoint collection, merge and deduplicate"
+    Write-Host "  --content, -Content      " -ForegroundColor Yellow -NoNewline
+    Write-Host "Directory/path fuzzing on live hosts using FFuF with smart rate-limiting"
+    Write-Host "  --tech, -Tech            " -ForegroundColor Yellow -NoNewline
+    Write-Host "Technology stack fingerprinting (Wappalyzer signatures) on live hosts"
+    Write-Host "  --takeover, -Takeover    " -ForegroundColor Yellow -NoNewline
+    Write-Host "Subdomain takeover check using Nuclei takeover templates and Subzy"
+    Write-Host "  --vuln, -Vuln            " -ForegroundColor Yellow -NoNewline
+    Write-Host "Run Nuclei vulnerability templates against live HTTP/HTTPS hosts"
+    Write-Host "  --crawl, -Crawl          " -ForegroundColor Yellow -NoNewline
+    Write-Host "Recursive crawling with Katana to extract endpoints, forms, and JS URLs"
+    Write-Host "  --ports, -Ports          " -ForegroundColor Yellow -NoNewline
+    Write-Host "Comprehensive Nmap top 1000 port scan with service version detection"
+    Write-Host ""
+    Write-Host "OPTIONS:" -ForegroundColor Cyan
+    Write-Host "  -Concurrency <N>         " -ForegroundColor Yellow -NoNewline
+    Write-Host "Thread count for tools that support it (5-100, default: 25)"
+    Write-Host "  -OutputDir <path>        " -ForegroundColor Yellow -NoNewline
+    Write-Host "Base output directory (default: .\magnus-out\<target>\)"
+    Write-Host "  -h, -Help                " -ForegroundColor Yellow -NoNewline
+    Write-Host "Show this help message and exit"
+    Write-Host ""
+    Write-Host "REQUIRED TOOLS:" -ForegroundColor Cyan
+    Write-Host "  Core      : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "subfinder, httpx, naabu/nmap"
+    Write-Host "  Passive   : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "assetfinder, crt.sh (built-in)"
+    Write-Host "  DNS       : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "puredns or dnsx"
+    Write-Host "  Endpoints : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "waybackurls, gau, uro"
+    Write-Host "  Content   : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "ffuf"
+    Write-Host "  Takeover  : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "nuclei, subzy"
+    Write-Host "  Crawl     : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "katana"
+    Write-Host "  Optional  : " -ForegroundColor DarkGray -NoNewline
+    Write-Host "gotator, dnsgen"
+    Write-Host ""
+    Write-Host "EXAMPLES:" -ForegroundColor Cyan
+    Write-Host "  .\magnus.ps1 --recon example.com" -ForegroundColor Green
+    Write-Host "      Run full recon pipeline on example.com"
+    Write-Host ""
+    Write-Host "  .\magnus.ps1 --recon targets.txt" -ForegroundColor Green
+    Write-Host "      Run full recon on all domains listed in targets.txt"
+    Write-Host ""
+    Write-Host "  .\magnus.ps1 -gp example.com" -ForegroundColor Green
+    Write-Host "      Collect endpoints from Wayback Machine and GAU"
+    Write-Host ""
+    Write-Host "  .\magnus.ps1 --vuln example.com --concurrency 15" -ForegroundColor Green
+    Write-Host "      Run vulnerability scan with 15 threads"
+    Write-Host ""
+    Write-Host "  .\magnus.ps1 --passive example.com -OutputDir C:\results" -ForegroundColor Green
+    Write-Host "      Passive recon with custom output directory"
+    Write-Host ""
+    Write-Host "  Author  : RemmyNine" -ForegroundColor DarkGray
+    Write-Host "  License : GPL-3.0" -ForegroundColor DarkGray
+    Write-Host "  Repo    : https://github.com/RemmyNine/OffensiveSecurity" -ForegroundColor DarkGray
+    Write-Host ""
+}
+
+# ----------------------------------------------------------------------------
 # MAIN DISPATCH
 # ----------------------------------------------------------------------------
 
+# Handle -h / -Help first
+if ($Help) {
+    Show-Help
+    exit 0
+}
+
 if (-not $Target -and ($Recon -or $Endpoints -or $Content -or $Tech -or $Passive -or $Crawl -or $Ports)) {
     Write-Host "[!] Target required for this mode. Usage: .\magnus.ps1 --recon example.com" -ForegroundColor Red
+    Write-Host "    Run .\magnus.ps1 -h for full help." -ForegroundColor DarkGray
     exit 1
 }
 
@@ -826,16 +920,7 @@ if (-not $Target -and ($Recon -or $Endpoints -or $Content -or $Tech -or $Passive
 if (-not ($Recon -or $Endpoints -or $Content -or $Tech -or $Takeover -or $Vuln -or $Passive -or $Crawl -or $Ports)) {
     if ($Target) { $Recon = $true }
     else {
-        Write-Host "USAGE:" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --recon    target.com       Full recon (subs + live HTTP + port scan)" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 -gp        target.com       Wayback + GAU endpoint collection" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --content  target.com       Directory and path fuzzing" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --tech     target.com       Technology stack fingerprinting" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --takeover target.com       Subdomain takeover check" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --vuln     target.com       Nuclei vulnerability scanning" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --passive  target.com       Passive-only recon (no probing)" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --crawl    target.com       Katana crawling + JS extraction" -ForegroundColor White
-        Write-Host "  .\magnus.ps1 --ports    target.com       Comprehensive Nmap top 1000 scan" -ForegroundColor White
+        Show-Help
         exit 0
     }
 }
@@ -870,4 +955,5 @@ elseif ($Passive)    {
 elseif ($Crawl)      { Invoke-Crawl -Input $Target }
 elseif ($Ports)      { Invoke-ComprehensivePortScan -Input $Target }
 
-Write-Host "`nMagnus finished at $(Get-Date -Format 'HH:mm:ss')." -ForegroundColor Cyan
+$FinishTime = Get-Date -Format 'HH:mm:ss'
+Write-Host "`nMagnus finished at $FinishTime." -ForegroundColor Cyan
