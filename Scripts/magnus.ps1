@@ -235,14 +235,14 @@ function Invoke-PassiveRecon {
 
     Write-Host "[+] crt.sh" -ForegroundColor Gray
     try {
-        $CrtshUri = "https://crt.sh/?q=%25.$TargetDomain&output=json"
+        $CrtshUri = "https://crt.sh/?q=%25.$TargetDomain" + "&output=json"
         $CrtshResp = Invoke-RestMethod -Uri $CrtshUri -TimeoutSec 30
         $CrtshResp | ForEach-Object { $_.name_value } | ForEach-Object { $_ -split '\n' } |
             Where-Object { $_ -like "*.$TargetDomain" -or $_ -eq $TargetDomain } | Sort-Object -Unique |
             Out-File -FilePath $tmpCrtsh -Encoding utf8
     } catch { Write-Host "[!] crt.sh query failed" -ForegroundColor Red }
 
-    Write-Host "[*] Merging & deduplicating passive results..." -ForegroundColor Yellow
+    Write-Host "[*] Merging and deduplicating passive results..." -ForegroundColor Yellow
     @($tmpSubfinder, $tmpAssetfinder, $tmpCrtsh) | ForEach-Object {
         if (Test-Path $_) { Get-Content -LiteralPath $_ }
     } | Where-Object { $_ -match '\S' } | Sort-Object -Unique | Out-File -FilePath $OutFile -Encoding utf8
@@ -384,7 +384,7 @@ function Invoke-EndpointCollection {
         gau --subs --threads 5 $TargetDomain | Out-File -FilePath $GauOut -Encoding utf8
     } catch { Write-Host "[!] gau failed" -ForegroundColor Red }
 
-    Write-Host "[*] Merging & deduplicating..." -ForegroundColor Yellow
+    Write-Host "[*] Merging and deduplicating..." -ForegroundColor Yellow
     @($WaybackOut, $GauOut) | ForEach-Object {
         if (Test-Path $_) { Get-Content -LiteralPath $_ }
     } | Where-Object { $_ -match '\S' } | Sort-Object -Unique | Out-File -FilePath $MergedOut -Encoding utf8
@@ -826,18 +826,16 @@ if (-not $Target -and ($Recon -or $Endpoints -or $Content -or $Tech -or $Passive
 if (-not ($Recon -or $Endpoints -or $Content -or $Tech -or $Takeover -or $Vuln -or $Passive -or $Crawl -or $Ports)) {
     if ($Target) { $Recon = $true }
     else {
-        Write-Host @"
-USAGE:
-  .\magnus.ps1 --recon    <domain|file>    Full recon (subs -> live HTTP -> port scan)
-  .\magnus.ps1 -gp        <domain>          Wayback + GAU endpoint collection
-  .\magnus.ps1 --content  <domain|file>    Directory & path fuzzing
-  .\magnus.ps1 --tech     <domain|file>    Technology stack fingerprinting
-  .\magnus.ps1 --takeover <domain|file>    Subdomain takeover check
-  .\magnus.ps1 --vuln     <domain|file>    Nuclei vulnerability scanning
-  .\magnus.ps1 --passive  <domain|file>    Passive-only recon (no probing)
-  .\magnus.ps1 --crawl    <domain|file>    Katana crawling + JS extraction
-  .\magnus.ps1 --ports    <domain|file>    Comprehensive Nmap top 1000 scan
-"@ -ForegroundColor White
+        Write-Host "USAGE:" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --recon    target.com       Full recon (subs + live HTTP + port scan)" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 -gp        target.com       Wayback + GAU endpoint collection" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --content  target.com       Directory and path fuzzing" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --tech     target.com       Technology stack fingerprinting" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --takeover target.com       Subdomain takeover check" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --vuln     target.com       Nuclei vulnerability scanning" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --passive  target.com       Passive-only recon (no probing)" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --crawl    target.com       Katana crawling + JS extraction" -ForegroundColor White
+        Write-Host "  .\magnus.ps1 --ports    target.com       Comprehensive Nmap top 1000 scan" -ForegroundColor White
         exit 0
     }
 }
