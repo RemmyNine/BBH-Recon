@@ -1,6 +1,6 @@
 # 08. Red Team Tradecraft, Infrastructure & Detection Engineering
 
-This section covers the theoretical mechanics of Red Team infrastructure design, stealthy reconnaissance, and the corresponding defensive telemetry used by Blue Teams to detect and mitigate these activities.
+This section covers the theoretical mechanics of Red Team infrastructure design, stealthy reconnaissance, Active Directory (AD) Pentesting & Red Teaming concepts, and the corresponding defensive telemetry used by Blue Teams to detect and mitigate these activities.
 
 ---
 
@@ -9,6 +9,18 @@ This section covers the theoretical mechanics of Red Team infrastructure design,
   - [Defensive Analysis: JARM & JA3/JA4 Fingerprinting](#defensive-analysis-jarm--ja3ja4-fingerprinting)
 - [External Active Directory & Tenant Profiling](#external-active-directory--tenant-profiling)
   - [Defensive Analysis: Monitoring Tenant Footprints](#defensive-analysis-monitoring-tenant-footprints)
+- [Active Directory Pentesting & Red Teaming Theory](#active-directory-pentesting--red-teaming-theory)
+  - [AD Architecture & Trust Topologies](#ad-architecture--trust-topologies)
+  - [LDAP Enumeration Mechanics](#ldap-enumeration-mechanics)
+    - [Defensive Telemetry: LDAP Auditing (Event ID 1644)](#defensive-telemetry-ldap-auditing-event-id-1644)
+  - [Kerberos Authentication Attacks](#kerberos-authentication-attacks)
+    - [1. AS-REP Roasting (Pre-Authentication Bypass)](#1-as-rep-roasting-pre-authentication-bypass)
+    - [2. Kerberoasting (Service Principal Abuse)](#2-kerberoasting-service-principal-abuse)
+    - [Defensive Telemetry: Kerberos Logging (Event IDs 4768 & 4769)](#defensive-telemetry-kerberos-logging-event-ids-4768--4769)
+  - [Privilege Escalation & Delegation Abuse](#privilege-escalation--delegation-abuse)
+    - [1. Unconstrained Delegation](#1-unconstrained-delegation)
+    - [2. Constrained Delegation & S4U Extensions](#2-constrained-delegation--s4u-extensions)
+    - [Defensive Remediation: Hardening Delegation](#defensive-remediation-hardening-delegation)
 - [Defense Evasion in Network Reconnaissance](#defense-evasion-in-network-reconnaissance)
   - [Defensive Analysis: Beaconing & Scan Detection](#defensive-analysis-beaconing--scan-detection)
 - [Edge Device & Initial Access Profiling](#edge-device--initial-access-profiling)
@@ -78,7 +90,7 @@ Microsoft exposes specific endpoints that allow organizations to query domain fe
 ### 2. Identity Provider Fingerprinting
 Organizations routing authentication through external services expose login endpoints:
 - **Okta**: `https://target.okta.com`
-- **Active Directory Federation Services (ADFS)**: `/adfs/ls/idpinitiatedsignon.aspx`
+- **Keepers / Active Directory Federation Services (ADFS)**: `/adfs/ls/idpinitiatedsignon.aspx`
 - **PingFederate**: `/pingfederate/`
 
 ---
@@ -91,6 +103,112 @@ Defenders monitor Azure Active Directory and on-premise Active Directory access 
   - **Tenant Restrictions**: Configure firewall or web gateway rules to restrict outbound M365 access only to approved corporate directory tenants.
   - **Blocking Legacy Authentication**: Disable legacy protocols (e.g., IMAP, POP3, SMTP authentication) that bypass Multi-Factor Authentication (MFA).
 - **Log Correlation**: Monitor Azure Active Directory Sign-in Logs (specifically Event ID `4625` on ADFS or failed sign-in status codes like `50053` - Account Locked, `50126` - Invalid Credentials).
+
+---
+
+## Active Directory Pentesting & Red Teaming Theory
+
+Once internal access or initial foot-holding is established, Active Directory becomes the primary target for lateral movement, privilege escalation, and domain dominance.
+
+### AD Architecture & Trust Topologies
+
+An Active Directory Forest consists of one or more Domain Trees, which share a common schema, configuration, and global catalog.
+- **Domain Trusts**: Relationships that allow users in one domain to access resources in another.
+  - **Transitive Trusts**: If Domain A trusts Domain B, and Domain B trusts Domain C, then Domain A implicitly trusts Domain C.
+  - **Non-Transitive Trusts**: A trust relationship restricted strictly to the two participating domains.
+  - **Shortcut & Parent-Child Trusts**: Internal trusts created to optimize authentication paths.
+  - **External / Forest Trusts**: Created between separate organizations or distinct forests.
+
+---
+
+### LDAP Enumeration Mechanics
+
+Lightweight Directory Access Protocol (LDAP) is the protocol used to query and manage directory objects in AD (Domain Controllers listen on TCP/UDP 389 and 636 for LDAPS).
+
+- **Enumeration Concept**: Standard domain users have default read permissions to almost all AD objects. Operators run LDAP queries programmatically to retrieve:
+  - Users, Groups, Computers, and Organisational Units (OUs).
+  - Group memberships (e.g., identifying nested members of the `Domain Admins` group).
+  - Trust details (using attributes like `trustDirection` and `trustType`).
+  - Active Directory Schema metadata.
+
+#### Defensive Telemetry: LDAP Auditing (Event ID 1644)
+Domain Controllers can be configured to log LDAP searches that exceed resource limits or query high volumes of objects.
+- **Windows Event Log**: `Directory Service` log, Event ID **1644**.
+- **Data Logged**: Lists the IP address of the client performing the LDAP query, the exact search filter used, and the number of objects returned.
+- **Hardening**: Restrict standard user read DACLs on sensitive AD objects (such as computer accounts or specific OUs) to limit automated mapping tools.
+
+---
+
+### Kerberos Authentication Attacks
+
+Kerberos is the default authentication protocol in Active Directory. It relies on a Key Distribution Center (KDC) running on Domain Controllers (TCP/UDP port 88).
+
+```mermaid
+sequenceDiagram
+    participant User as Client/Domain User
+    participant KDC as Domain Controller (KDC)
+    participant Server as Target Service Resource
+
+    Note over User, KDC: AS Exchange (Pre-Auth)
+    User->>KDC: AS-REQ (TGT Request with Timestamp encrypted with password hash)
+    KDC->>User: AS-REP (TGT + Session Key)
+
+    Note over User, KDC: TGS Exchange
+    User->>KDC: TGS-REQ (TGT + SPN of target service)
+    KDC->>User: TGS-REP (Service Ticket encrypted with Service Account Hash)
+
+    Note over User, Server: AP Exchange
+    User->>Server: AP-REQ (Service Ticket)
+    Server->>User: Authenticated Access Granted
+```
+
+#### 1. AS-REP Roasting (Pre-Authentication Bypass)
+- **Vulnerability**: If the attribute `DONT_REQ_PREAUTH` (Do not require Kerberos preauthentication) is set on a user account, anyone can send an `AS-REQ` to the KDC on behalf of that user.
+- **Attack Mechanics**: The KDC returns an `AS-REP` containing a ticket encrypted with the target user's password hash. Since no pre-authentication timestamp was validated, this ticket can be extracted from the network capture and cracked offline using dictionary or brute-force attacks.
+
+#### 2. Kerberoasting (Service Principal Abuse)
+- **Vulnerability**: Any authenticated domain user can request a Kerberos service ticket (`TGS-REP`) for any Service Principal Name (SPN) registered in the Active Directory forest.
+- **Attack Mechanics**: When a client sends a `TGS-REQ` specifying an SPN registered under a user account (service account), the KDC returns a `TGS-REP` ticket encrypted with that service account's password hash. The client extracts this ticket from memory and cracks it offline to recover the service account password.
+
+#### Defensive Telemetry: Kerberos Logging (Event IDs 4768 & 4769)
+Domain Controllers log Kerberos ticket requests in the Windows Security Log.
+
+- **Event ID 4768 (Authentication Ticket Requested - AS-REQ)**:
+  - **AS-REP Roasting Detection**: Look for Event ID 4768 where Pre-Authentication Type is listed as `0` (or `0x0` - None), indicating pre-authentication was bypassed.
+- **Event ID 4769 (Service Ticket Requested - TGS-REQ)**:
+  - **Kerberoasting Detection**: Look for abnormal ticket request patterns:
+    - High frequency of Event ID 4769 requests from a single source host targeting multiple service names.
+    - **Encryption Downgrade**: Monitor for tickets requested with **RC4-HMAC (Type 0x17 / 23)** encryption instead of standard AES-256 (Type 0x12 / 18). Attackers often downgrade encryption because RC4 is significantly faster to crack offline.
+  - **Honeytoken Accounts**: Create fake SPNs registered under accounts with highly attractive names (e.g., `SQL-Admin-Service`). Configure SIEM alerts to trigger immediately if an Event ID 4769 is logged targeting these specific honeytoken accounts, as they have no legitimate business function.
+
+---
+
+### Privilege Escalation & Trust Abuse
+
+Once administrative control over local machines or services is obtained, delegation configurations allow operators to impersonate domain users.
+
+#### 1. Unconstrained Delegation
+- **Vulnerability**: When a computer or user account is configured with Unconstrained Delegation, it can impersonate any domain user that authenticates to it.
+- **Attack Mechanics**: When a user attempts to access a service running on a machine with unconstrained delegation, the domain controller inserts a copy of that user's Ticket Granting Ticket (TGT) into the service ticket. The machine stores the user's TGT in the LSASS (Local Security Authority Subsystem Service) memory. An operator who compromises this machine can extract these cached TGTs from memory to impersonate high-privilege users (e.g., Domain Admins).
+
+#### 2. Constrained Delegation & S4U Extensions
+- **Vulnerability**: Constrained Delegation restricts impersonation to specific services (e.g., HTTP/server-1). However, it uses Microsoft Kerberos extensions: **S4U2self** (Service for User to Self) and **S4U2proxy** (Service for User to Proxy).
+- **Attack Mechanics**: 
+  - **S4U2self**: Allows a service to request a service ticket for itself on behalf of any domain user (without validating their password), provided the service has constrained delegation configured.
+  - **S4U2proxy**: Allows the service to present that ticket to the KDC to request an impersonation ticket targeting downstream services. If an operator compromises the account hash of a machine/user with constrained delegation, they can generate custom S4U requests to impersonate Domain Admins to the allowed services.
+
+---
+
+### Defensive Remediation: Hardening Delegation
+
+To prevent delegation abuse, secure Active Directory settings:
+
+1. **Disable Unconstrained Delegation**: Transition all systems to Resource-Based Constrained Delegation (RBCD) or Standard Constrained Delegation.
+2. **Protected Users Security Group**: Add high-privilege administrative accounts to the default AD group `Protected Users`. This group enforces strict security policies:
+   - Restricts delegation (TGTs cannot be delegated or cached).
+   - Disables weak encryption ciphers.
+   - Enforces Kerberos authentication (disables NTLM fallbacks).
+3. **Sensitive Flag**: Mark administrative accounts as `Account is sensitive and cannot be delegated` in their AD user properties.
 
 ---
 

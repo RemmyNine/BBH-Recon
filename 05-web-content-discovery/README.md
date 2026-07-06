@@ -6,10 +6,14 @@ Content discovery locates hidden assets, routes, configuration backups, paramete
 
 ## Table of Contents
 - [Directory & Path Fuzzing](#directory--path-fuzzing)
+  - [Heuristics & Soft-404 Handling](#heuristics--soft-404-handling)
 - [Crawler & Spider Tools](#crawler--spider-tools)
 - [Historical Endpoint Mining](#historical-endpoint-mining)
 - [API & GraphQL Profiling](#api--graphql-profiling)
+  - [API Spec Reconstruction](#api-spec-reconstruction)
 - [JavaScript Analysis & Secrets Extraction](#javascript-analysis--secrets-extraction)
+  - [Abstract Syntax Tree (AST) Parsing](#abstract-syntax-tree-ast-parsing)
+- [Defensive Auditing: Rate Limiting & Detection](#defensive-auditing-rate-limiting--detection)
 
 ---
 
@@ -42,6 +46,11 @@ Fuzzing paths uses structured wordlists to locate non-linked pages, developer ba
 ### Backup & Sensitive Extensions to Watch
 Ensure your fuzzing profiles always test for variations of discovered files appended with:
 `.bak`, `.old`, `.tmp`, `.swp`, `.1`, `.orig`, `.save`, `.sql`, `.dump`, `.log`, `.cfg`, `.conf`, `.env`, `.pem`, `.key`, `.xml`, `.yaml`, `.yml`, `.json`, `.tar.gz`, `.zip`
+
+### Heuristics & Soft-404 Handling
+Many modern web frameworks return `200 OK` status codes for non-existent pages, embedding error messages within the body (Soft-404s).
+- **Dynamic Calibration**: Tools like FFuF and Feroxbuster can dynamically filter responses based on line count (`-fl`), word count (`-fw`), or character length (`-fs`).
+- **Wildcard Detection**: Send a request to a randomized path (e.g., `/uniquepath_123_xyz`) before starting. Record its response length and body hash to filter out wildcard matches automatically.
 
 ---
 
@@ -102,6 +111,11 @@ Check standard path schemas for Swagger or OpenAPI JSON descriptors:
   clairvoyance -u https://example.com/graphql -o schema.json
   ```
 
+### API Spec Reconstruction
+When Swagger pages are disabled, you can reconstruct the schema from raw endpoint lists:
+1. Map variables using token identification (e.g., `/api/v1/user/{id}`).
+2. Feed endpoints into automated tools (e.g., `mitmproxy` scripts or custom parsers) to auto-generate OpenAPI v3 JSON templates.
+
 ---
 
 ## JavaScript Analysis & Secrets Extraction
@@ -124,3 +138,23 @@ Analyzing client-side JavaScript allows you to extract API keys, tokens, backend
 
 ### Webpack Reconstruct
 - **[Webpack Exploit / Decompiler](https://github.com/lzghzr/webpack-explode)**: If the target site hosts a source map file (e.g., `main.js.map`), decompile the bundle to reconstruct the original frontend source tree.
+
+### Abstract Syntax Tree (AST) Parsing
+Standard regex scanners miss dynamically generated paths (e.g., `url = host + "/v1/" + endpoint`).
+- **Concept**: AST parsing reads JavaScript code and constructs a logical syntax tree. Tools query tree node transitions (e.g., `Identifier` concatenated with `Literal`) to identify compiled endpoints.
+- **Implementation**: Node.js scripts using libraries like `esprima` or `acorn` parse script variables programmatically to isolate base URLs and route matrices.
+
+---
+
+## Defensive Auditing: Rate Limiting & Detection
+
+Web Application Firewalls (WAFs) and API Gateways actively monitor request velocities to block scanning traffic.
+
+### Evasion Concepts (Theoretical Mechanics)
+- **Header Injection**: Some WAFs trust headers for source IP determination. Scanners rotate standard headers:
+  `X-Forwarded-For`, `X-Real-IP`, `X-Originating-IP`, `CF-Connecting-IP`
+- **Request Pacing**: Introduce high random jitter (e.g., 500ms to 2000ms delay between actions) to stay beneath rate-limiting thresholds.
+
+### Defensive Telemetry
+- **API Gateway Logging**: Systems monitor request volume per IP client and cross-reference proxy header modifications against actual network layer source addresses.
+- **Outlier Analysis**: SIEM rule engines flag IPs that trigger high volumes of `404 Not Found` or `403 Forbidden` status codes within a compressed window.

@@ -6,10 +6,14 @@ Active reconnaissance involves direct interaction with target systems to map hos
 
 ## Table of Contents
 - [DNS Bruteforcing & Permutation](#dns-bruteforcing--permutation)
+  - [Algorithmic Permutations & Heuristics](#algorithmic-permutations--heuristics)
 - [Subdomain Takeover Auditing](#subdomain-takeover-auditing)
-- [IP Space & ASN Mapping](#ip-space--asn-mapping)
+- [IP Space, ASN & BGP Route Discovery](#ip-space-asn--bgp-route-discovery)
+  - [Autonomous Systems & BGP Analysis](#autonomous-systems--bgp-analysis)
 - [Port Scanning & Service Fingerprinting](#port-scanning--service-fingerprinting)
-- [Host Header & VHost Fuzzing](#host-header--vhost-fuzzing)
+- [Host Header, SNI & VHost Fuzzing](#host-header-sni--vhost-fuzzing)
+  - [SNI vs Host Header Fuzzing Mechanics](#sni-vs-host-header-fuzzing-mechanics)
+- [Defensive Analysis: Port Scan Telemetry](#defensive-analysis-port-scan-telemetry)
 
 ---
 
@@ -46,6 +50,12 @@ Generating mutations of known subdomains (adding prefixes like `dev-`, suffixes 
   cat resolved_subs.txt | dnsgen - | puredns resolve -r resolvers.txt -o perm_resolved.txt
   ```
 
+### Algorithmic Permutations & Heuristics
+Static mutation lists (word replacements) are generic. Advanced permutation tools use heuristic algorithms:
+1. **Numeric Iteration**: If `api-01.target.com` exists, the engine automatically checks `api-02` through `api-99`.
+2. **Delimited Splitting**: Breaking domains by dashes or dots (`dev.infra.target.com` -> `infra.dev.target.com` or `dev-infra-target`).
+3. **Entropy-Based Fuzzing**: Identifying low-entropy word transitions common to network administrators (e.g., `prod`, `stag`, `internal`, `test`, `uat`, `admin`, `vpn`).
+
 ---
 
 ## Subdomain Takeover Auditing
@@ -71,7 +81,7 @@ Cross-reference the returned CNAME target with the profiles in [Can-I-take-over-
 
 ---
 
-## IP Space & ASN Mapping
+## IP Space, ASN & BGP Route Discovery
 
 Identify the client's registered IP address blocks (CIDRs) and Autonomous System Numbers (ASNs) to widen target discovery.
 
@@ -88,6 +98,11 @@ Identify the client's registered IP address blocks (CIDRs) and Autonomous System
   ```bash
   curl -s "https://ipinfo.io/AS12345" | jq '.prefixes[].prefix'
   ```
+
+### Autonomous Systems & BGP Analysis
+Autonomous Systems (AS) route internet traffic via Border Gateway Protocol (BGP).
+- **Prefix Discovery**: Querying regional registries (ARIN, RIPE, APNIC, LACNIC, AFRINIC) using organization handles retrieves entire IP segments owned directly by the target.
+- **Route Monitoring**: Analyzing historical BGP routing updates reveals network boundary changes and temporarily advertised networks (which are often poorly protected).
 
 ---
 
@@ -127,9 +142,14 @@ masscan -p0-65535 --rate 25000 -iL cidrs.txt -oG masscan_output.txt
 
 ---
 
-## Host Header & VHost Fuzzing
+## Host Header, SNI & VHost Fuzzing
 
-Web servers hosting multiple domains determine routing based on the HTTP `Host` header. Fuzzing this header can expose hidden administrative portals.
+Web servers hosting multiple domains determine routing based on the HTTP `Host` header or TLS handshake parameters.
+
+### SNI vs Host Header Fuzzing Mechanics
+- **TLS SNI (Server Name Indication)**: Sent during the initial TLS Client Hello handshake. The router or proxy uses it to route traffic before decrypting the TLS layer.
+- **HTTP Host Header**: Sent within the encrypted HTTP request.
+- **VHost Discovery**: Modern reverse proxies (e.g. Cloudflare, Cloudfront) discard requests if the SNI domain name does not match their internal routing maps. True virtual host discovery requires matching the SNI parameter to the Host header.
 
 ### FFuF Host Fuzzing
 ```bash
@@ -137,3 +157,16 @@ ffuf -w subdomains_wordlist.txt -u "https://TARGET_IP" -H "Host: FUZZ.example.co
   -mc 200,301,302,403 -t 50 -o vhost_hits.json
 ```
 Filter out default generic responses by matching size/word counts (`-fs` or `-fw`).
+
+---
+
+## Defensive Analysis: Port Scan Telemetry
+
+Active network scanning triggers immediate intrusion detection system alerts.
+
+- **Firewall & IPS Event Correlation**: Network gateways monitor incoming TCP connection states. Scans are identified by:
+  - **SYN Scans**: High volume of TCP SYN packets followed immediately by RST packets (half-open scanning).
+  - **FIN/NULL/Xmas Scans**: Packets with unusual flag combinations that bypass standard stateless firewalls.
+- **Defensive Mitigations**:
+  - **Fail2ban / IP Tables Rate Limiting**: Block IPs that exceed a specified number of new connections per second.
+  - **Port Knocking**: Hide sensitive ports (like SSH/RDP) behind a sequence of closed-port connection attempts.
