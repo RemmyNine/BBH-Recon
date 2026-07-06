@@ -74,3 +74,27 @@ The framework has been reorganized into a folderized structure to improve naviga
 ---
 
 > **Maintained by [RemmyNine](https://github.com/RemmyNine)** | Contributions welcome via PR.
+
+---
+
+## Magnus — Offensive Security Automation
+
+The `Scripts/` directory contains **[magnus.ps1](./Scripts/magnus.ps1)** — a modular PowerShell recon automation script for bug bounty hunting.
+
+| Flag | Mode | Description |
+|------|------|-------------|
+| `--recon` | Full Recon | Passive subs → DNS resolution → live HTTP → port scan (CDN-common ports) |
+| `-gp` | Endpoint Collection | Wayback Machine + GAU URL aggregation, merge, clean, dedup |
+| `--content` | Content Discovery | FFuF directory/path fuzzing on live hosts |
+| `--tech` | Tech Fingerprinting | Wappalyzer-style stack detection via httpx |
+| `--takeover` | Takeover Check | Nuclei + Subzy subdomain takeover scanning |
+| `--vuln` | Vulnerability Scan | Nuclei CVE/exposure/misconfig templates |
+| `--passive` | Passive Recon | Passive-only enumeration (subfinder, assetfinder, crt.sh) |
+| `--crawl` | Web Crawling | Katana recursive crawling + JS file extraction |
+| `--ports` | Port Scan | Comprehensive Nmap top 1000 port scan |
+
+```powershell
+.\Scripts\magnus.ps1 --recon example.com
+.\Scripts\magnus.ps1 -gp example.com
+.\Scripts\magnus.ps1 --vuln example.com --concurrency 15
+```
